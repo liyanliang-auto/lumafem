@@ -1,0 +1,63 @@
+// Internal fixed-physical-weak-zone benchmark. Not a new production modelling feature.
+#include "json_codec.hpp"
+#include <cmath>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <filesystem>
+#include <map>
+using namespace lumafem;
+int main(int argc,char**argv){try{
+ if(argc==2&&std::string(argv[1])=="--help"){std::cout<<"localization_bar tension|compression mesh-length NEW-output-prefix [mapping] [search0|1] [onset0|1] [step-scale] [gauss] [--length N --weak-centre N --width N]\n";return 0;}
+ if(argc<4)throw std::runtime_error("localization_bar tension|compression mesh-length output-prefix [mapping] [search] [onset] [step-scale] [gauss]");
+ bool tension=std::string(argv[1])=="tension";double mesh=std::stod(argv[2]);std::string prefix=argv[3];
+ std::string mapping=argc>4?argv[4]:"gauss_weight_v1";bool search=argc>5?std::stoi(argv[5])!=0:false,onset=argc>6?std::stoi(argv[6])!=0:false;double stepScale=argc>7?std::stod(argv[7]):1.;int gauss=argc>8?std::stoi(argv[8]):3;
+ bool physical=false,tight=false;double totalLength=1000,weakCentre=487,weakWidth=100;for(int i=9;i<argc;i+=2){if(i+1>=argc)throw std::runtime_error("missing named benchmark value");std::string key=argv[i];double value=std::stod(argv[i+1]);if(key=="--physical")physical=value!=0;else if(key=="--tight")tight=value!=0;else if(key=="--length")totalLength=value;else if(key=="--weak-centre")weakCentre=value;else if(key=="--width")weakWidth=value;else throw std::runtime_error("unknown benchmark option");}if(!(totalLength>0&&weakWidth>0&&weakCentre>weakWidth/2&&weakCentre+weakWidth/2<totalLength))throw std::runtime_error("invalid fixed physical benchmark geometry");
+ if(!(stepScale>0))throw std::runtime_error("positive step scale required");
+ for(auto suffix:{"-maps.csv","-curve.csv","-summary.json","-transitions.jsonl"})if(std::filesystem::exists(prefix+suffix))throw std::runtime_error("Refuse existing bar output");
+ ModelDefinition d;d.name="fixed physical weak-zone bar";d.identity={"localization-test","revision","snapshot","run",""};d.geometry={totalLength,10,10,0};
+ MaterialParameters p;p.id="concrete";p.fc=30;p.e0=.002;p.fr=6;p.ft=3;p.Gft=.1;p.Gcp=10;p.unloadRatio=.1;p.referenceLength=100;p.crushReferenceStrain=.0035;
+ d.materials={p};d.concreteMaterialId=p.id;d.reinforcement.mode="direct";d.discretization={"custom",mesh,gauss,2,mapping};
+ d.supports={{"left",0,{true,true,true},{0,0,0}},{"right",totalLength,{false,true,true},{0,0,0}}};d.loads={{"axial",totalLength,{tension?100.:-100.,0,0}}};d.controlX=totalLength;d.controlComponent=0;d.controlDirection=tension?1:-1;d.observations.referencePhase="S0";
+ d.analysis.initialStep=tension?.0005:.005;d.analysis.maximumStep=tension?.005:.02;d.analysis.maximumControlDisplacement=tension?.5:5.;d.analysis.maximumAcceptedSteps=4000;
+ d.analysis.initialStep*=stepScale;d.analysis.maximumStep*=stepScale;d.analysis.lineSearchEnabled=search;d.analysis.transitionResolutionEnabled=onset;
+ if(search||onset){d.analysis.maximumIterations=60;d.analysis.maximumHalvings=18;}
+ if(physical&&!tension){CompressionCriterionDefinition cc;cc.mode=physicalGaugeMeanMode;cc.gaugeLength=100;cc.threshold=.0035;d.compressionCriterion=cc;}
+ if(tight){d.analysis.residualAbsolute*=.1;d.analysis.residualRelative*=.1;d.analysis.correctionAbsolute*=.1;d.analysis.correctionRelative*=.1;d.analysis.controlAbsolute*=.1;d.analysis.controlRelative*=.1;}
+ auto prep=prepareModel(d);if(!prep.ok)throw std::runtime_error("bar preparation failed");auto&m=prep.model;
+ std::ofstream maps(prefix+"-maps.csv");maps<<std::setprecision(17)<<"x,length,strength_factor,ft,fc,Ets,eu\n";
+ for(auto&s:m.sections){double xx=(s.x-weakCentre)/(weakWidth/2);double factor=std::abs(xx)<1?1-.1*std::pow(1-xx*xx,2):1.;
+  auto update=[&](MaterialParameters&q){q.fc*=factor;q.fr*=factor;q.ft*=factor;q.E0=2*q.fc/q.e0;q.E=missing;q.Ets=q.ft*q.ft/(2*q.Gft/q.lchT-q.ft*q.ft/q.E0);q.etu=q.ft/q.E0+q.ft/q.Ets;q.deltaU=2*q.Gcp/(q.fc+q.fr);double k=(q.fc-q.fr)/q.deltaU;q.eu=q.e0+q.deltaU/q.lchC-(q.fc-q.fr)/q.E0;q.compressionSlope=k/(1/q.lchC-k/q.E0);q.deltaCritical=(q.crushReferenceStrain-q.e0)/(1/q.referenceLength-k/q.E0);};
+  for(auto&f:s.fibers)update(f.material);for(auto&e:s.edges)update(e.material);
+  const auto&q=s.fibers[0].material;maps<<s.x<<','<<s.integrationLength<<','<<factor<<','<<q.ft<<','<<q.fc<<','<<q.Ets<<','<<q.eu<<'\n';
+ }
+ std::ofstream transitionFile(prefix+"-transitions.jsonl");
+ std::ofstream acceptedFile(prefix+"-accepted.jsonl");
+ std::ofstream csv(prefix+"-curve.csv");csv<<std::setprecision(17)<<"u,F,envelope_energy,damage_left,damage_right,max_local_strain,max_reference,active_elements,independent_coordinate_energy,residual_baseline,material_work,search_evaluations,search_backtracks,minimum_factor,transition_kind,recoverable_energy,opening,analytic_coordinate_target\n";
+ double lastu=0,lastf=0,work=0,energy=0,maximumForce=0,left=0,right=0,maxstrain=0,maxref=0;std::size_t accepted=0;
+ double independentEnergy=0,residualEnergy=0,materialWork=0;std::map<std::string,std::array<double,4>> prior;int activeElements=0;
+ double recoverable=0,opening=0,analyticTarget=0,initialCompliance=0;codec::Json firstZero=nullptr;for(auto&e:m.elements){double meanE=0;for(auto index:e.sectionIndices){auto&s=m.sections[index];meanE+=s.integrationLength*s.fibers[0].material.E0/e.length;}initialCompliance+=e.length/meanE;}
+ auto unloadWork=[](const MaterialParameters&p,const MaterialState&state){double a=state.strain,b=state.compressionUnloadStrain;if(!(a<b)||state.stress>=0)return 0.;double E=p.E0,Eu=state.compressionUnloadSlope;std::vector<double>points{a,b};for(double ratio:{1.,.5}){double slope=ratio*Eu;if(E!=slope){double cross=(E*a-state.stress-slope*b)/(E-slope);if(cross>a&&cross<b)points.push_back(cross);}}std::sort(points.begin(),points.end());auto stress=[&](double e){double predictor=state.stress+E*(e-a),lower=Eu*(e-b),upper=.5*Eu*(e-b);return std::min(std::max(predictor,lower),upper);};double work=0;for(std::size_t i=1;i<points.size();++i)work-=.5*(stress(points[i-1])+stress(points[i]))*(points[i]-points[i-1]);return work;};
+ AcceptedStep lastStep;AnalysisHooks hooks;hooks.persist=[&](const AcceptedStep&s){lastStep=s;double u=s.controlDisplacement,F=std::abs(s.loadFactor)*100;work+=(u-lastu)*(F+lastf)*.5;lastu=u;lastf=F;energy=0;left=1e9;right=-1e9;maxstrain=0;maxref=0;
+  std::map<std::size_t,bool> damaged;recoverable=0;opening=0;analyticTarget=0;
+  for(std::size_t i=0;i<s.sections.size();++i){const auto&result=s.sections[i];const auto&ps=m.sections[i];for(std::size_t j=0;j<result.fibers.size();++j){auto&state=result.fibers[j].state;auto&fiber=ps.fibers[j];double coord=tension?state.tensionEnergy:state.compressionEnergy;energy+=fiber.area*coord*ps.integrationLength/(tension?fiber.material.lchT:fiber.material.lchC);bool damage=tension?state.tensionEnvelopeStrain>fiber.material.ft/fiber.material.E0*1.00001:-state.minStrain>fiber.material.e0*1.00001;if(damage){left=std::min(left,ps.x);right=std::max(right,ps.x);damaged[ps.elementIndex]=true;}maxstrain=std::max(maxstrain,std::abs(state.strain));maxref=std::max(maxref,state.maxReferenceCompressionStrain);
+   auto&previous=prior[fiber.id];double coordinate=0,q=fiber.material.fc;if(tension){coordinate=fiber.material.lchT*(state.tensionEnvelopeStrain-state.tensionStress/fiber.material.E0);q=state.tensionStress;}else if(-state.minStrain>fiber.material.e0){q=-state.compressionStress;coordinate=fiber.material.lchC*(-state.minStrain-fiber.material.e0-(q-fiber.material.fc)/fiber.material.E0);}
+   double lch=tension?fiber.material.lchT:fiber.material.lchC;double oldq=previous[0]==0?(tension?fiber.material.ft:fiber.material.fc):previous[1];if(coordinate>previous[0]){independentEnergy+=fiber.area*ps.integrationLength/lch*.5*(oldq+q)*(coordinate-previous[0]);if(!tension)residualEnergy+=fiber.area*ps.integrationLength/lch*fiber.material.fr*(coordinate-previous[0]);previous[0]=coordinate;previous[1]=q;}
+   materialWork+=fiber.area*ps.integrationLength*.5*(previous[3]+state.stress)*(state.strain-previous[2]);previous[2]=state.strain;previous[3]=state.stress;
+   if(tension){double secant=state.tensionEnvelopeStrain>0?state.tensionStress/state.tensionEnvelopeStrain:fiber.material.E0;if(secant>0)recoverable+=fiber.area*ps.integrationLength*state.stress*state.stress/(2*secant);opening+=ps.integrationLength/lch*coordinate*fiber.area/100.;double wEnd=2*fiber.material.Gft/fiber.material.ft;double w=std::min(std::max(coordinate,0.),wEnd);analyticTarget+=fiber.area*ps.integrationLength/lch*(fiber.material.ft*w-fiber.material.ft*w*w/(2*wEnd));}
+   else{recoverable+=fiber.area*ps.integrationLength*unloadWork(fiber.material,state);double dc=std::min(coordinate,fiber.material.deltaU);double k=(fiber.material.fc-fiber.material.fr)/fiber.material.deltaU;analyticTarget+=fiber.area*ps.integrationLength/lch*(fiber.material.fc*dc-.5*k*dc*dc);}
+  }}activeElements=static_cast<int>(damaged.size());
+  maximumForce=std::max(maximumForce,F);csv<<u<<','<<F<<','<<energy<<','<<(left==1e9?0:left)<<','<<(right<0?0:right)<<','<<maxstrain<<','<<maxref<<','<<activeElements<<','<<independentEnergy<<','<<residualEnergy<<','<<materialWork<<','<<s.convergence.lineSearchEvaluations<<','<<s.convergence.lineSearchBacktracks<<','<<s.convergence.minimumCorrectionFactor<<','<<s.transition.kind<<','<<recoverable<<','<<opening<<','<<analyticTarget<<'\n';accepted=s.sequence+1;
+  if(tension&&firstZero.is_null()&&maximumForce>1&&F<=maximumForce*1e-6&&recoverable<=10.*1e-6)firstZero={{"accepted_sequence",s.sequence},{"u",u},{"F",F},{"external_work",work},{"coordinate_energy",energy},{"independent_coordinate_energy",independentEnergy},{"analytic_coordinate_target",analyticTarget},{"opening",opening},{"recoverable_energy",recoverable},{"expected_single_band_AG",10.},{"active_elements",activeElements},{"definition","first actual accepted traction-free state; force<=1e-6peak and recoverable<=1e-6AG; not a run termination rename"}};
+  if(s.transition.active){transitionFile<<codec::stepToJson(s).dump()<<'\n';transitionFile.flush();}
+  codec::Json accepted={{"sequence",s.sequence},{"phase",s.phase==Phase::S0?"S0":"J"},{"control_displacement",s.controlDisplacement},{"displacement",s.displacement},{"convergence",codec::convergenceToJson(s.convergence)},{"transition",codec::transitionToJson(s.transition)},{"localization_active",s.localization.active}};
+  if(s.gauge)accepted["gauge"]=codec::gaugeStateToJson(*s.gauge);
+  acceptedFile<<accepted.dump()<<'\n';acceptedFile.flush();
+  PersistedStepReceipt r;r.ok=true;r.identity=s.identity;r.persistedSequence=static_cast<std::int64_t>(s.sequence);r.transactionId="test-observer-not-project-storage";return r;};
+ auto summary=runAnalysis(m,m.definition.analysis,hooks);auto result=codec::summaryToJson(summary);result["test_only_prepared_material_transform"]="factor1-0.1*(1-((x-weak_centre)/(weak_width/2))^2)^2 inside fixed support; exact geometry/profile parameters recorded below";result["mesh_length"]=mesh;result["kind"]=tension?"tension":"compression";result["accepted"]=accepted;result["last_u"]=lastu;result["last_force"]=lastf;result["peak_force"]=maximumForce;result["external_work"]=work;result["coordinate_energy"]=energy;result["target_full_tensile_GA"]=10.;result["damage_extent"]=right>=left?right-left:0.;result["max_local_strain"]=maxstrain;result["max_reference_strain"]=maxref;result["compression_full_energy_not_expected"]=!tension;result["test_observer_not_project_persistence"]=true;
+ result["mapping"]=mapping;result["line_search_enabled"]=search;result["transition_resolution_enabled"]=onset;result["step_scale"]=stepScale;result["gauss_points"]=gauss;result["active_elements"]=activeElements;result["independent_coordinate_energy"]=independentEnergy;result["residual_baseline"]=residualEnergy;result["material_work"]=materialWork;
+ result["total_length"]=totalLength;result["weak_centre"]=weakCentre;result["weak_width"]=weakWidth;result["initial_axial_strain_compliance"]=initialCompliance;result["recoverable_energy"]=recoverable;result["opening"]=opening;result["analytic_coordinate_target"]=analyticTarget;result["mechanical_dissipation"]=materialWork-recoverable;result["excess_coordinate_energy"]=independentEnergy-residualEnergy;result["first_traction_free_completion"]=firstZero;
+ result["physical_mode"]=physical;result["tight_tolerances"]=tight;{std::ofstream last(prefix+"-last.json");last<<codec::stepToJson(lastStep).dump();}
+ std::ofstream file(prefix+"-summary.json");file<<result.dump(2);std::cout<<result.at("termination")<<'\n';return 0;
+}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 2;}}
+

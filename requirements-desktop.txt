@@ -1,0 +1,20 @@
+# Windows x64 / CPython 3.10. Native build and desktop runtime.
+cmake==3.30.5
+ninja==1.11.1.1
+pybind11==2.13.6
+numpy==1.26.4
+PySide6==6.7.3
+PySide6_Addons==6.7.3
+PySide6_Essentials==6.7.3
+shiboken6==6.7.3
+vtk==9.3.1
+matplotlib==3.9.2
+contourpy==1.3.0
+cycler==0.12.1
+fonttools==4.55.0
+kiwisolver==1.4.7
+packaging==24.2
+pillow==11.0.0
+pyparsing==3.2.0
+python-dateutil==2.9.0.post0
+six==1.16.0

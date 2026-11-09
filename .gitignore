@@ -4,3 +4,19 @@
 /.vs/
 __pycache__/
 *.pyc
+
+# Local requirements, research references and design drafts. Never force-add.
+/development_doc/
+
+# Local implementation pipeline and evidence; may reference private research.
+/specs/
+/.venv/
+/dist/
+*.pyd
+*.dll
+*.lib
+*.obj
+*.exp
+
+# Local development knowledge index; not a public product document.
+/CODE_WIKI.md

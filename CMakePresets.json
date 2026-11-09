@@ -1,0 +1,33 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {"major": 3, "minor": 24, "patch": 0},
+  "configurePresets": [
+    {
+      "name": "windows-release",
+      "displayName": "Windows x64 Release (use scripts/build.ps1)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "Python_EXECUTABLE": "${sourceDir}/.venv/Scripts/python.exe",
+        "LUMAFEM_BUILD_PYTHON": true,
+        "BUILD_TESTING": true
+      }
+    },
+    {
+      "name": "windows-core",
+      "inherits": "windows-release",
+      "binaryDir": "${sourceDir}/build/core",
+      "cacheVariables": {"LUMAFEM_BUILD_PYTHON": false}
+    }
+  ],
+  "buildPresets": [
+    {"name": "windows-release", "configurePreset": "windows-release"},
+    {"name": "windows-core", "configurePreset": "windows-core"}
+  ],
+  "testPresets": [
+    {"name": "windows-release", "configurePreset": "windows-release", "output": {"outputOnFailure": true}},
+    {"name": "windows-core", "configurePreset": "windows-core", "output": {"outputOnFailure": true}}
+  ]
+}

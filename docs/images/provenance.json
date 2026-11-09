@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-09",
+  "images": [
+    {
+      "file": "analysis-mainwindow.jpg",
+      "source": "specs/20261109-072002-m9zy/testing-r3-parent-native-source/actual-source-mainwindow-strain.jpg",
+      "sha256": "d1c7193b22d6f245a032103a6ec6b0eec5e7fc7a0338a0c39bd1b5914b754107",
+      "kind": "SOURCE_SHORT_NATIVE_WINDOW",
+      "transformation": "none; byte-exact copy",
+      "public_review": "No visible account, absolute local path, private document or raw research table. Default/QA results only; assumptions and limitations in captions."
+    },
+    {
+      "file": "desktop-model-preview.jpg",
+      "source": "specs/20261109-125223-priw/testing-parent-native/actual-exe-mainwindow-final.jpg",
+      "sha256": "d0ec9f15dc34a6ed074f81dabef9e880cce218f34a546a297289eff6be6b322d",
+      "kind": "GUI_ICON_NATIVE_WINDOW_INPUT_ONLY",
+      "transformation": "none; byte-exact copy",
+      "public_review": "No visible account, absolute local path, private document or raw research table. Default/QA results only; assumptions and limitations in captions."
+    },
+    {
+      "file": "m50-step269-concrete-stress.png",
+      "source": "specs/20261109-072002-m9zy/testing-r3-m50-bundled/M50-step-0269-concrete_stress-true-vtk.png",
+      "sha256": "2b76024e6904e9ed507857e52d192e2a21f27e0e30c395192ba6cb6acaed4a02",
+      "kind": "M50_COMPONENT_EXPORT",
+      "transformation": "none; byte-exact copy",
+      "public_review": "No visible account, absolute local path, private document or raw research table. Default/QA results only; assumptions and limitations in captions."
+    },
+    {
+      "file": "m50-step269-concrete-strain.png",
+      "source": "specs/20261109-072002-m9zy/testing-r3-m50-bundled/M50-step-0269-concrete_strain-true-vtk.png",
+      "sha256": "c82060de762acdbee1a01ddc57eba1ba20aad52557da4fe4c6f8b3dfddf5dfbf",
+      "kind": "M50_COMPONENT_EXPORT",
+      "transformation": "none; byte-exact copy",
+      "public_review": "No visible account, absolute local path, private document or raw research table. Default/QA results only; assumptions and limitations in captions."
+    },
+    {
+      "file": "short-mainwindow-viewport-strain.png",
+      "source": "specs/20261109-072002-m9zy/testing-r3-mainwindow-export/short-mainwindow-strain-true-vtk.png",
+      "sha256": "8042e003f8f7bc6942160d754b5cba77f5d8c02dc2ac4c70b5906c713d972e89",
+      "kind": "SHORT_MAINWINDOW_VIEWPORT_EXPORT",
+      "transformation": "none; byte-exact copy",
+      "public_review": "No visible account, absolute local path, private document or raw research table. Default/QA results only; assumptions and limitations in captions."
+    }
+  ]
+}

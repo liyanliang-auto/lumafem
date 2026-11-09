@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "brand": "LumaFEM",
+  "artwork_version": "v2",
+  "source": {
+    "kind": "AI-generated brand artwork",
+    "generation_date": "2026-11-09",
+    "method": "Built-in image generation; approved original PNG and multi-resolution ICO copied byte-exact without redrawing or reencoding"
+  },
+  "approval": {
+    "status": "USER_APPROVED",
+    "date": "2026-11-09",
+    "scope": "Use the v2 finite-element mesh, contour and load-arrow artwork as the application icon"
+  },
+  "files": [
+    {
+      "file": "lumafem.png",
+      "sha256": "918e360f5d8bcf8e36926ad37441fc6f07d915880e0a748d3feb600d0d4856a4",
+      "bytes": 1465862
+    },
+    {
+      "file": "lumafem.ico",
+      "sha256": "e9d8895491156b29fda600d04c5fe873d5ab67dbd3e279e1b42ca79db039ac8b",
+      "bytes": 118255
+    }
+  ],
+  "ico_sizes_px": [
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64,
+    128,
+    256
+  ],
+  "alpha": {
+    "preserved": true,
+    "range": [
+      0,
+      255
+    ],
+    "each_ico_size_has_transparent_and_opaque_pixels": true,
+    "near_transparent_antialiased_corners": {
+      "sizes_px": [
+        20,
+        24
+      ],
+      "observed_alpha_values": [
+        1,
+        2
+      ],
+      "maximum_alpha": 2
+    },
+    "basis": "Approved v2 encoding and reopening record; independent integration verification remains separate"
+  },
+  "interpretation": "Illustrative finite-element branding, not a computed field, solver screenshot, scientific evidence, or claim of solid-element solver capability."
+}
